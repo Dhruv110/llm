@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU Specification Comparison</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;700&display=swap');
+
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0f0f12;
+      --surface: #18181c;
+      --surface-hover: #222228;
+      --border: #2d2d35;
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #22c55e;
+      --accent-dim: #16a34a;
+    }
+
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-weight: 700;
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      align-items: center;
+    }
+
+    .select-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .select-wrap label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    select {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      padding: 0.6rem 2rem 0.6rem 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      min-width: 180px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.6rem center;
+    }
+
+    select:hover {
+      background-color: var(--surface-hover);
+      border-color: var(--accent-dim);
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+    }
+
+    .comparison {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-weight: 600;
+      background: rgba(34, 197, 94, 0.08);
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    th.spec-name {
+      color: var(--text-muted);
+      font-weight: 500;
+      min-width: 220px;
+      position: sticky;
+      left: 0;
+      background: var(--surface);
+      z-index: 1;
+    }
+
+    tr:last-child td, tr:last-child th {
+      border-bottom: none;
+    }
+
+    tr:hover td:not(.spec-name), tr:hover th.spec-name {
+      background: var(--surface-hover);
+    }
+
+    td {
+      font-family: 'JetBrains Mono', monospace;
+      vertical-align: top;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state p {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .loading .loading-spinner {
+      display: inline-block;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-state {
+      color: #f87171;
+    }
+    .error-state a {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <h1>GPU Specification Comparison</h1>
+  <p class="subtitle">Select up to 5 GPUs to compare their specifications. </p>
+
+  <div class="controls">
+    <div class="select-wrap">
+      <label for="gpu1">GPU 1</label>
+      <select id="gpu1">
+        <option value="">-- Select GPU --</option>
+      </select>
+    </div>
+    <div class="select-wrap">
+      <label for="gpu2">GPU 2</label>
+      <select id="gpu2">
+        <option value="">-- Select GPU --</option>
+      </select>
+    </div>
+    <div class="select-wrap">
+      <label for="gpu3">GPU 3</label>
+      <select id="gpu3">
+        <option value="">-- Select GPU --</option>
+      </select>
+    </div>
+    <div class="select-wrap">
+      <label for="gpu4">GPU 4</label>
+      <select id="gpu4">
+        <option value="">-- Select GPU --</option>
+      </select>
+    </div>
+    <div class="select-wrap">
+      <label for="gpu5">GPU 5</label>
+      <select id="gpu5">
+        <option value="">-- Select GPU --</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="comparison">
+    <div id="table-container">
+      <div class="empty-state loading" id="loading-state">
+        <p><span class="loading-spinner"></span>Loading GPU data from gpu_specs.csv…</p>
+      </div>
+      <div class="empty-state" id="empty-state" style="display: none;">
+        <p>Select one or more GPUs above to view the comparison.</p>
+      </div>
+      <div class="empty-state error-state" id="error-state" style="display: none;"></div>
+      <table id="compare-table" style="display: none;">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let GPU_DATA = null;
+
+    const gpuSelects = [
+      document.getElementById('gpu1'),
+      document.getElementById('gpu2'),
+      document.getElementById('gpu3'),
+      document.getElementById('gpu4'),
+      document.getElementById('gpu5')
+    ];
+    const loadingState = document.getElementById('loading-state');
+    const emptyState = document.getElementById('empty-state');
+    const errorState = document.getElementById('error-state');
+    const compareTable = document.getElementById('compare-table');
+    const tableHead = document.getElementById('table-head');
+    const tableBody = document.getElementById('table-body');
+
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0;
+      const s = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      while (i < s.length) {
+        const row = [];
+        while (i < s.length) {
+          let field = '';
+          if (s[i] === '"') {
+            i++;
+            while (i < s.length && s[i] !== '"') {
+              field += s[i];
+              i++;
+            }
+            if (s[i] === '"') i++;
+          } else {
+            while (i < s.length && s[i] !== ',' && s[i] !== '\n') {
+              field += s[i];
+              i++;
+            }
+          }
+          row.push(field.trim());
+          if (s[i] === ',') { i++; continue; }
+          if (s[i] === '\n') { i++; break; }
+          if (i >= s.length) break;
+        }
+        if (row.length > 0) rows.push(row);
+      }
+      return rows;
+    }
+
+    function csvToGPUData(rows) {
+      if (rows.length < 2) return null;
+      const header = rows[0];
+      const gpus = header.slice(1);
+      const specs = [];
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const name = row[0];
+        const values = row.slice(1, gpus.length + 1);
+        while (values.length < gpus.length) values.push('-');
+        specs.push({ name, values });
+      }
+      return { gpus, specs };
+    }
+
+    function showState(which) {
+      loadingState.style.display = which === 'loading' ? 'block' : 'none';
+      emptyState.style.display = which === 'empty' ? 'block' : 'none';
+      errorState.style.display = which === 'error' ? 'block' : 'none';
+      compareTable.style.display = which === 'table' ? 'table' : 'none';
+    }
+
+    function showError(message) {
+      errorState.innerHTML = message;
+      showState('error');
+    }
+
+    async function loadGPUData() {
+      showState('loading');
+      try {
+        const res = await fetch('gpu_specs.csv');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        const rows = parseCSV(text);
+        GPU_DATA = csvToGPUData(rows);
+        if (!GPU_DATA || GPU_DATA.gpus.length === 0) {
+          showError('<p>Invalid CSV: need a header row with GPU names and at least one spec row.</p>');
+          return;
+        }
+        showState('empty');
+        initDropdowns();
+        renderTable();
+      } catch (err) {
+        const isFile = window.location.protocol === 'file:';
+        showError(
+          '<p><strong>Could not load gpu_specs.csv</strong></p>' +
+          (isFile
+            ? '<p>Opening from disk (file://) blocks loading the CSV. Serve this folder with a local server, e.g.:</p><p><code>python -m http.server 8000</code></p><p>Then open <a href="http://localhost:8000/gpu_compare.html">http://localhost:8000/gpu_compare.html</a></p>'
+            : '<p>' + (err.message || String(err)) + '</p>')
+        );
+      }
+    }
+
+    function initDropdowns() {
+      gpuSelects.forEach(select => {
+        while (select.options.length > 1) select.remove(1);
+      });
+      GPU_DATA.gpus.forEach(name => {
+        gpuSelects.forEach(select => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+      });
+    }
+
+    function getSelectedGPUs() {
+      const selected = [];
+      gpuSelects.forEach(select => {
+        if (select.value) selected.push(select.value);
+      });
+      return selected;
+    }
+
+    function getIndicesForGPUs(names) {
+      return names.map(name => GPU_DATA.gpus.indexOf(name));
+    }
+
+    function renderTable() {
+      const selected = getSelectedGPUs();
+      if (selected.length === 0) {
+        showState('empty');
+        return;
+      }
+
+      showState('table');
+      const indices = getIndicesForGPUs(selected);
+
+      let headerHtml = '<tr><th class="spec-name">Specification</th>';
+      selected.forEach(name => {
+        headerHtml += `<th>${escapeHtml(name)}</th>`;
+      });
+      headerHtml += '</tr>';
+      tableHead.innerHTML = headerHtml;
+
+      let bodyHtml = '';
+      GPU_DATA.specs.forEach(spec => {
+        bodyHtml += `<tr><th class="spec-name">${escapeHtml(spec.name)}</th>`;
+        indices.forEach(i => {
+          const val = spec.values[i] ?? '-';
+          bodyHtml += `<td>${escapeHtml(val)}</td>`;
+        });
+        bodyHtml += '</tr>';
+      });
+      tableBody.innerHTML = bodyHtml;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function preventDuplicateSelection(exceptSelect) {
+      const selected = getSelectedGPUs();
+      gpuSelects.forEach(select => {
+        Array.from(select.options).forEach(opt => {
+          if (opt.value) {
+            opt.disabled = selected.includes(opt.value) && select.value !== opt.value;
+          } else {
+            opt.disabled = false;
+          }
+        });
+      });
+    }
+
+    gpuSelects.forEach(select => {
+      select.addEventListener('change', () => {
+        preventDuplicateSelection(select);
+        if (GPU_DATA) renderTable();
+      });
+    });
+
+    loadGPUData();
+  </script>
+</body>
+</html>
