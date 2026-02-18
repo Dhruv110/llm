@@ -1,0 +1,29 @@
+# systemd service for GPU Compare (HTTP server on port 9000)
+# Ubuntu 24.04 – copy to /etc/systemd/system/ and edit paths/user if needed
+#
+# Install:
+#   sudo cp gpu-compare.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/gpu-compare.service   # set WorkingDirectory and User
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now gpu-compare
+#   sudo systemctl status gpu-compare
+
+[Unit]
+Description=GPU Compare – HTTP server for gpu_compare.html
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+# Directory containing gpu_compare.html and gpu_specs.csv
+WorkingDirectory=/opt/gpu-compare
+ExecStart=/usr/bin/python3 -m http.server 9000 --bind 0.0.0.0
+Restart=always
+RestartSec=5
+# Bind to all interfaces (0.0.0.0) so it’s reachable from the network
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
