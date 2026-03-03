@@ -44,6 +44,18 @@
       margin-bottom: 2rem;
     }
 
+    .baseline-note {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .ratio {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 0.85em;
+    }
+
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -129,6 +141,14 @@
       z-index: 1;
     }
 
+    th.gpu-header--nvidia {
+      color: var(--accent);
+    }
+
+    th.gpu-header--other {
+      color: #4169e1;
+    }
+
     tr:last-child td, tr:last-child th {
       border-bottom: none;
     }
@@ -176,7 +196,17 @@
 </head>
 <body>
   <h1>GPU Specification Comparison</h1>
-  <p class="subtitle">Select up to 5 GPUs to compare their specifications. </p>
+  <p class="subtitle">Select up to 5 GPUs to compare their specifications.</p>
+  <p class="baseline-note" id="baseline-note" style="display: none;">The first selected GPU (left-most dropdown) is the baseline (1.0x). Numeric specs show relative comparison.</p>
+
+  <div class="controls">
+    <div class="select-wrap">
+      <label for="component-filter">Component</label>
+      <select id="component-filter">
+        <option value="">All</option>
+      </select>
+    </div>
+  </div>
 
   <div class="controls">
     <div class="select-wrap">
@@ -237,6 +267,7 @@
       document.getElementById('gpu4'),
       document.getElementById('gpu5')
     ];
+    const componentFilter = document.getElementById('component-filter');
     const loadingState = document.getElementById('loading-state');
     const emptyState = document.getElementById('empty-state');
     const errorState = document.getElementById('error-state');
@@ -276,17 +307,40 @@
     }
 
     function csvToGPUData(rows) {
-      if (rows.length < 2) return null;
+      if (!Array.isArray(rows) || rows.length < 1) return null;
       const header = rows[0];
-      const gpus = header.slice(1);
+      if (!Array.isArray(header) || header.length < 1) return null;
+
+      const labelIdx = 0;
+      const componentIdx = header.findIndex(
+        (h) => h != null && String(h).toLowerCase().trim() === 'component'
+      );
+
+      const gpuColIndices = [];
+      for (let i = 0; i < header.length; i++) {
+        if (i === labelIdx || i === componentIdx) continue;
+        gpuColIndices.push(i);
+      }
+
+      const gpus = gpuColIndices.map((i) => (header[i] != null ? String(header[i]).trim() : ''));
       const specs = [];
+
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r];
-        const name = row[0];
-        const values = row.slice(1, gpus.length + 1);
+        if (!Array.isArray(row)) continue;
+        const name = (row[labelIdx] != null ? String(row[labelIdx]).trim() : '') || '—';
+        const component =
+          componentIdx >= 0 && componentIdx < row.length
+            ? (row[componentIdx] != null ? String(row[componentIdx]).trim() : '')
+            : '';
+        const values = gpuColIndices.map((i) => {
+          const v = (row[i] != null ? row[i] : '').toString().trim();
+          return v === '' ? '-' : v;
+        });
         while (values.length < gpus.length) values.push('-');
-        specs.push({ name, values });
+        specs.push({ name, component, values });
       }
+
       return { gpus, specs };
     }
 
@@ -308,14 +362,29 @@
         const res = await fetch('gpu_specs.csv');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
-        const rows = parseCSV(text);
+        let rows;
+        try {
+          rows = parseCSV(text);
+        } catch (e) {
+          showError('<p>Invalid CSV: could not parse file format.</p>');
+          return;
+        }
+        if (!Array.isArray(rows) || rows.length < 1) {
+          showError('<p>Invalid CSV: need at least a header row.</p>');
+          return;
+        }
         GPU_DATA = csvToGPUData(rows);
-        if (!GPU_DATA || GPU_DATA.gpus.length === 0) {
-          showError('<p>Invalid CSV: need a header row with GPU names and at least one spec row.</p>');
+        if (!GPU_DATA) {
+          showError('<p>Invalid CSV: could not parse header or data.</p>');
+          return;
+        }
+        if (GPU_DATA.gpus.length === 0) {
+          showError('<p>Invalid CSV: no GPU columns found. Ensure the header has at least one column besides "GPU Name" and "Component".</p>');
           return;
         }
         showState('empty');
         initDropdowns();
+        initComponentFilter();
         renderTable();
       } catch (err) {
         const isFile = window.location.protocol === 'file:';
@@ -329,54 +398,148 @@
     }
 
     function initDropdowns() {
-      gpuSelects.forEach(select => {
+      gpuSelects.forEach((select) => {
         while (select.options.length > 1) select.remove(1);
       });
-      GPU_DATA.gpus.forEach(name => {
-        gpuSelects.forEach(select => {
+      if (!GPU_DATA || !GPU_DATA.gpus.length) return;
+      GPU_DATA.gpus.forEach((name) => {
+        gpuSelects.forEach((select) => {
           const opt = document.createElement('option');
           opt.value = name;
-          opt.textContent = name;
+          opt.textContent = name || '—';
           select.appendChild(opt);
         });
       });
     }
 
+    function initComponentFilter() {
+      if (!componentFilter) return;
+      while (componentFilter.options.length > 1) {
+        componentFilter.remove(1);
+      }
+      if (!GPU_DATA || !GPU_DATA.specs.length) return;
+      const seen = new Set();
+      GPU_DATA.specs.forEach((spec) => {
+        const comp = (spec.component != null ? String(spec.component).trim() : '');
+        if (!comp || seen.has(comp)) return;
+        seen.add(comp);
+        const opt = document.createElement('option');
+        opt.value = comp;
+        opt.textContent = comp;
+        componentFilter.appendChild(opt);
+      });
+    }
+
     function getSelectedGPUs() {
       const selected = [];
-      gpuSelects.forEach(select => {
-        if (select.value) selected.push(select.value);
+      gpuSelects.forEach((select) => {
+        if (select && select.value) selected.push(select.value);
       });
       return selected;
     }
 
     function getIndicesForGPUs(names) {
-      return names.map(name => GPU_DATA.gpus.indexOf(name));
+      if (!GPU_DATA || !GPU_DATA.gpus.length) return names.map(() => -1);
+      return names.map((name) => GPU_DATA.gpus.indexOf(name));
+    }
+
+    /** Get the "Company Name" spec value for a GPU at the given index, or null if no such spec. */
+    function getCompanyNameForGpuIndex(gpuIndex) {
+      if (!GPU_DATA || !GPU_DATA.specs || gpuIndex < 0) return null;
+      const spec = GPU_DATA.specs.find(
+        (s) => (s.name != null ? String(s.name).trim().toLowerCase() : '') === 'company name'
+      );
+      if (!spec || !spec.values) return null;
+      const v = spec.values[gpuIndex];
+      return v != null ? String(v).trim() : null;
+    }
+
+    /** Parse a numeric value from a spec cell (e.g. "270", "1.2", "400-500" -> 400). Returns NaN if not numeric. */
+    function parseNumeric(s) {
+      if (s == null || s === '') return NaN;
+      const str = String(s).trim();
+      if (str === '-' || str === '') return NaN;
+      const m = str.match(/^(-?\d+(?:\.\d+)?)/);
+      return m ? parseFloat(m[1]) : NaN;
+    }
+
+    /** Format a cell: if row is numeric and baseline is numeric, show "value (ratio x)"; else show value as-is. */
+    function formatCellWithRatio(val, baselineNum, colIndex) {
+      const raw = (val ?? '-').toString().trim();
+      if (raw === '') return escapeHtml('-');
+      if (baselineNum === undefined || Number.isNaN(baselineNum)) {
+        return escapeHtml(raw);
+      }
+      const num = parseNumeric(raw);
+      if (Number.isNaN(num)) {
+        return escapeHtml(raw);
+      }
+      if (colIndex === 0) {
+        return escapeHtml(raw) + ' <span class="ratio">(1.0x)</span>';
+      }
+      if (baselineNum === 0) {
+        return escapeHtml(raw) + ' <span class="ratio">(—)</span>';
+      }
+      const ratio = num / baselineNum;
+      const ratioStr = ratio === 1 ? '1.0x' : ratio.toFixed(2) + 'x';
+      return escapeHtml(raw) + ' <span class="ratio">(' + ratioStr + ')</span>';
     }
 
     function renderTable() {
       const selected = getSelectedGPUs();
       if (selected.length === 0) {
         showState('empty');
+        const baselineNote = document.getElementById('baseline-note');
+        if (baselineNote) baselineNote.style.display = 'none';
         return;
       }
 
+      if (!GPU_DATA) return;
+      const selectedInData = selected.filter((name) => GPU_DATA.gpus.includes(name));
+      if (selectedInData.length === 0) {
+        showState('empty');
+        const baselineNote = document.getElementById('baseline-note');
+        if (baselineNote) baselineNote.style.display = 'none';
+        return;
+      }
+
+      const selectedComponent = componentFilter ? componentFilter.value : '';
+      const specsToRender =
+        !selectedComponent
+          ? GPU_DATA.specs
+          : GPU_DATA.specs.filter(
+              (spec) =>
+                (spec.component != null ? String(spec.component).trim().toLowerCase() : '') ===
+                (selectedComponent && selectedComponent.trim().toLowerCase())
+            );
+
       showState('table');
-      const indices = getIndicesForGPUs(selected);
+      const indices = getIndicesForGPUs(selectedInData);
+
+      const baselineNote = document.getElementById('baseline-note');
+      if (baselineNote) baselineNote.style.display = 'block';
 
       let headerHtml = '<tr><th class="spec-name">Specification</th>';
-      selected.forEach(name => {
-        headerHtml += `<th>${escapeHtml(name)}</th>`;
+      selectedInData.forEach((name) => {
+        const gpuIndex = GPU_DATA.gpus.indexOf(name);
+        const company = getCompanyNameForGpuIndex(gpuIndex);
+        const isNvidia = company != null && company.toLowerCase() === 'nvidia';
+        const headerClass = isNvidia ? 'gpu-header--nvidia' : 'gpu-header--other';
+        headerHtml += `<th class="${headerClass}">${escapeHtml(name || '—')}</th>`;
       });
       headerHtml += '</tr>';
       tableHead.innerHTML = headerHtml;
 
       let bodyHtml = '';
-      GPU_DATA.specs.forEach(spec => {
-        bodyHtml += `<tr><th class="spec-name">${escapeHtml(spec.name)}</th>`;
-        indices.forEach(i => {
-          const val = spec.values[i] ?? '-';
-          bodyHtml += `<td>${escapeHtml(val)}</td>`;
+      specsToRender.forEach((spec) => {
+        const rowValues = indices.map((i) => (i >= 0 ? (spec.values[i] ?? '-') : '-'));
+        const baselineVal = rowValues[0];
+        const baselineNum = parseNumeric(baselineVal);
+
+        bodyHtml += `<tr><th class="spec-name">${escapeHtml(spec.name || '—')}</th>`;
+        rowValues.forEach((val, colIndex) => {
+          const cellHtml = formatCellWithRatio(val, baselineNum, colIndex);
+          bodyHtml += `<td>${cellHtml}</td>`;
         });
         bodyHtml += '</tr>';
       });
@@ -384,15 +547,16 @@
     }
 
     function escapeHtml(s) {
+      if (s == null) return '';
       const div = document.createElement('div');
-      div.textContent = s;
+      div.textContent = String(s);
       return div.innerHTML;
     }
 
     function preventDuplicateSelection(exceptSelect) {
       const selected = getSelectedGPUs();
-      gpuSelects.forEach(select => {
-        Array.from(select.options).forEach(opt => {
+      gpuSelects.forEach((select) => {
+        Array.from(select.options).forEach((opt) => {
           if (opt.value) {
             opt.disabled = selected.includes(opt.value) && select.value !== opt.value;
           } else {
@@ -402,12 +566,18 @@
       });
     }
 
-    gpuSelects.forEach(select => {
+    gpuSelects.forEach((select) => {
       select.addEventListener('change', () => {
         preventDuplicateSelection(select);
         if (GPU_DATA) renderTable();
       });
     });
+
+    if (componentFilter) {
+      componentFilter.addEventListener('change', () => {
+        if (GPU_DATA) renderTable();
+      });
+    }
 
     loadGPUData();
   </script>
