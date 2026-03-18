@@ -141,8 +141,24 @@
       z-index: 1;
     }
 
+    /* Freeze the header row (GPU names) while scrolling vertically. */
+    #compare-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--surface);
+    }
+
+    #compare-table thead th.spec-name {
+      z-index: 4;
+    }
+
     th.gpu-header--nvidia {
       color: var(--accent);
+    }
+
+    th.gpu-header--amd {
+      color: #ff8c00; /* orange */
     }
 
     th.gpu-header--other {
@@ -523,8 +539,12 @@
       selectedInData.forEach((name) => {
         const gpuIndex = GPU_DATA.gpus.indexOf(name);
         const company = getCompanyNameForGpuIndex(gpuIndex);
-        const isNvidia = company != null && company.toLowerCase() === 'nvidia';
-        const headerClass = isNvidia ? 'gpu-header--nvidia' : 'gpu-header--other';
+        const companyNorm = company != null ? String(company).trim().toLowerCase() : '';
+        const isNvidia = companyNorm === 'nvidia' || companyNorm.includes('nvidia');
+        const isAmd = companyNorm === 'amd' || companyNorm.includes('amd');
+        const headerClass = isAmd
+          ? 'gpu-header--amd'
+          : (isNvidia ? 'gpu-header--nvidia' : 'gpu-header--other');
         headerHtml += `<th class="${headerClass}">${escapeHtml(name || '—')}</th>`;
       });
       headerHtml += '</tr>';
